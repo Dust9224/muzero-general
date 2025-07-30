@@ -18,7 +18,9 @@ class MuZeroConfig:
 
         ### Game
         self.board_size = 10
-        self.observation_shape = (3, self.board_size, self.board_size)
+        self.num_obstacles = 0
+        self.num_food = 1
+        self.observation_shape = (4, self.board_size, self.board_size)
         self.action_space = list(range(4))  # Up, Down, Left, Right
         self.players = list(range(1))
         self.stacked_observations = 0
@@ -110,10 +112,15 @@ class Game(AbstractGame):
     """Game wrapper for the Snake environment."""
 
     def __init__(self, seed: int | None = None):
+        config = MuZeroConfig()
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
-        self.env = SnakeEnv(board_size=MuZeroConfig().board_size)
+        self.env = SnakeEnv(
+            board_size=config.board_size,
+            num_obstacles=config.num_obstacles,
+            num_food=config.num_food,
+        )
 
     def step(self, action: int):
         observation, reward, done = self.env.step(action)
@@ -135,20 +142,27 @@ class Game(AbstractGame):
 
 
 class SnakeEnv:
-    """Simple Snake game environment."""
+    """Snake game environment with optional obstacles and multiple food items."""
 
     ACTIONS = {0: (-1, 0), 1: (1, 0), 2: (0, -1), 3: (0, 1)}
 
-    def __init__(self, board_size: int = 10):
+    def __init__(self, board_size: int = 10, num_obstacles: int = 0, num_food: int = 1):
         self.size = board_size
+        self.num_obstacles = max(0, num_obstacles)
+        self.num_food = max(1, num_food)
+        self.score = 0
+        self.obstacles = set()
+        self.food = []
         self.reset()
 
     def reset(self):
         center = self.size // 2
         self.direction = (0, 1)
         self.snake = [(center, center - 1), (center, center), (center, center + 1)]
-        self.spawn_food()
+        self.score = 0
         self.done = False
+        self.spawn_obstacles()
+        self.spawn_food(initial=True)
         return self.get_observation()
 
     def legal_actions(self):
@@ -158,7 +172,6 @@ class SnakeEnv:
         if self.done:
             return self.get_observation(), 0.0, True
         new_dir = SnakeEnv.ACTIONS.get(action, self.direction)
-        # Prevent reversing
         if (-new_dir[0], -new_dir[1]) == self.direction and len(self.snake) > 1:
             new_dir = self.direction
         self.direction = new_dir
@@ -166,50 +179,83 @@ class SnakeEnv:
         head_x, head_y = self.snake[-1]
         new_head = (head_x + self.direction[0], head_y + self.direction[1])
 
-        # Check collisions
         if (
             not 0 <= new_head[0] < self.size
             or not 0 <= new_head[1] < self.size
             or new_head in self.snake
+            or new_head in self.obstacles
         ):
             self.done = True
             return self.get_observation(), -1.0, True
 
         reward = -0.01
         self.snake.append(new_head)
-        if new_head == self.food:
+        if new_head in self.food:
             reward = 1.0
+            self.score += 1
+            self.food.remove(new_head)
             self.spawn_food()
         else:
             self.snake.pop(0)
 
-        return self.get_observation(), reward, False
+        if len(self.snake) == self.size * self.size - len(self.obstacles):
+            self.done = True
+            reward = 1.0
 
-    def spawn_food(self):
-        empty_cells = [
+        return self.get_observation(), reward, self.done
+
+    def spawn_obstacles(self):
+        self.obstacles = set()
+        if self.num_obstacles <= 0:
+            return
+        cells = [
             (x, y)
             for x in range(self.size)
             for y in range(self.size)
             if (x, y) not in self.snake
         ]
-        self.food = random.choice(empty_cells)
+        if self.num_obstacles >= len(cells):
+            self.num_obstacles = max(0, len(cells) - 1)
+        self.obstacles.update(random.sample(cells, self.num_obstacles))
+
+    def spawn_food(self, initial: bool = False):
+        available = [
+            (x, y)
+            for x in range(self.size)
+            for y in range(self.size)
+            if (x, y) not in self.snake
+            and (x, y) not in self.obstacles
+            and (x, y) not in self.food
+        ]
+        if not available:
+            self.done = True
+            return
+
+        needed = self.num_food if initial else self.num_food - len(self.food)
+        needed = max(0, min(needed, len(available)))
+        self.food.extend(random.sample(available, needed))
 
     def render(self):
         grid = [["."] * self.size for _ in range(self.size)]
+        for x, y in self.obstacles:
+            grid[x][y] = "#"
         for x, y in self.snake:
             grid[x][y] = "O"
         head_x, head_y = self.snake[-1]
         grid[head_x][head_y] = "H"
-        food_x, food_y = self.food
-        grid[food_x][food_y] = "F"
+        for fx, fy in self.food:
+            grid[fx][fy] = "F"
         print("\n".join(" ".join(row) for row in grid))
+        print(f"Score: {self.score}")
 
     def get_observation(self):
-        obs = np.zeros((3, self.size, self.size), dtype=np.float32)
+        obs = np.zeros((4, self.size, self.size), dtype=np.float32)
         for x, y in self.snake[:-1]:
             obs[1, x, y] = 1.0
         head_x, head_y = self.snake[-1]
         obs[0, head_x, head_y] = 1.0
-        food_x, food_y = self.food
-        obs[2, food_x, food_y] = 1.0
+        for food_x, food_y in self.food:
+            obs[2, food_x, food_y] = 1.0
+        for ox, oy in self.obstacles:
+            obs[3, ox, oy] = 1.0
         return obs
