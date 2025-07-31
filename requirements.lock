@@ -103,6 +103,8 @@ matplotlib==3.5.0
     # via seaborn
 msgpack==1.0.2
     # via ray
+mss==10.0.0
+    # via -r requirements.in
 multidict==5.2.0
     # via
     #   aiohttp
@@ -130,6 +132,8 @@ opencensus==0.8.0
     # via ray
 opencensus-context==0.1.2
     # via opencensus
+opencv-python==4.12.0.88
+    # via -r requirements.in
 packaging==21.3
     # via
     #   matplotlib
@@ -155,6 +159,8 @@ pyasn1==0.4.8
     #   rsa
 pyasn1-modules==0.2.8
     # via google-auth
+pyautogui==0.9.54
+    # via -r requirements.in
 pydantic==1.8.2
     # via ray
 pyparsing==3.0.6
