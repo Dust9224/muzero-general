@@ -31,6 +31,8 @@ It is the successor to [AlphaZero](https://arxiv.org/abs/1712.01815) but without
 * [x] [Pretrained weights](https://github.com/werner-duvaud/muzero-general/tree/master/results) available
 * [ ] Windows support (Experimental / Workaround: Use the [notebook](https://github.com/werner-duvaud/muzero-general/blob/master/notebook.ipynb) in [Google Colab](https://colab.research.google.com))
 
+* [x] Snake game with configurable settings (walls on/off, grid size, rewards, etc.)
+
 ### Further improvements
 Here is a list of features which could be interesting to add but which are not in MuZero's paper. We are open to contributions and other ideas.
 
