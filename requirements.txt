@@ -5,6 +5,7 @@ ray
 seaborn
 tensorboard
 torch
-
 pygame
 nevergrad
+tensorflow==2.19.0
+tensortrade==1.0.3
